@@ -9,8 +9,15 @@ public protocol HTTPTransport: Sendable {
 public struct URLSessionTransport: HTTPTransport {
     private let session: URLSession
     
-    public init(session: URLSession = .shared) {
-        self.session = session
+    public init(session: URLSession = .shared, timeout: TimeoutConfiguration? = nil) {
+        if let timeout = timeout {
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = timeout.request
+            config.timeoutIntervalForResource = timeout.resource
+            self.session = URLSession(configuration: config)
+        } else {
+            self.session = session
+        }
     }
     
     public func send(_ request: HTTPRequest) async throws -> HTTPResponse {

@@ -4,6 +4,10 @@ import Foundation
 public struct HTTPClient: Sendable {
     private let core: HTTPClientCore
     
+    private init(core: HTTPClientCore) {
+        self.core = core
+    }
+    
     public init(configuration: HTTPClientConfiguration = .default, transport: HTTPTransport? = nil) {
         self.core = HTTPClientCore(configuration: configuration, transport: transport)
     }
@@ -45,15 +49,15 @@ public struct HTTPClient: Sendable {
     // MARK: - Interceptors (async — safe)
     
     public func addingRequestInterceptor(_ interceptor: RequestInterceptor) async -> HTTPClient {
-        let client = self
-        await client.core.addRequestInterceptor(interceptor)
-        return client
+        let newCore = await core.copy()
+        await newCore.addRequestInterceptor(interceptor)
+        return HTTPClient(core: newCore)
     }
     
     public func addingResponseInterceptor(_ interceptor: ResponseInterceptor) async -> HTTPClient {
-        let client = self
-        await client.core.addResponseInterceptor(interceptor)
-        return client
+        let newCore = await core.copy()
+        await newCore.addResponseInterceptor(interceptor)
+        return HTTPClient(core: newCore)
     }
     
     // MARK: - Direct Send
@@ -109,7 +113,7 @@ public struct HTTPRequestBuilder: Sendable {
     
     public func body<T: Encodable & Sendable>(_ value: T, encoder: JSONEncoder? = nil) throws -> HTTPRequestBuilder {
         var builder = self
-        let encoder = encoder ?? JSONEncoder()
+        let encoder = encoder ?? client.configuration.encoder
         let data = try encoder.encode(value)
         builder.request.body = .json(data)
         return builder
@@ -153,11 +157,35 @@ actor HTTPClientCore {
     
     init(configuration: HTTPClientConfiguration, transport: HTTPTransport? = nil) {
         self.configuration = configuration
-        self.transport = transport ?? URLSessionTransport()
+        self.transport = transport ?? URLSessionTransport(timeout: configuration.timeout)
         
         if case .memory(let maxSize) = configuration.cache.strategy {
             self.cache = HTTPResponseCache(maxSize: maxSize, defaultTTL: configuration.cache.defaultTTL)
         }
+    }
+    
+    func copy() -> HTTPClientCore {
+        HTTPClientCore(
+            configuration: configuration,
+            transport: transport,
+            requestInterceptors: requestInterceptors,
+            responseInterceptors: responseInterceptors,
+            cache: cache
+        )
+    }
+    
+    private init(
+        configuration: HTTPClientConfiguration,
+        transport: HTTPTransport,
+        requestInterceptors: [RequestInterceptor],
+        responseInterceptors: [ResponseInterceptor],
+        cache: HTTPResponseCache?
+    ) {
+        self.configuration = configuration
+        self.transport = transport
+        self.requestInterceptors = requestInterceptors
+        self.responseInterceptors = responseInterceptors
+        self.cache = cache
     }
     
     func addRequestInterceptor(_ interceptor: RequestInterceptor) {
