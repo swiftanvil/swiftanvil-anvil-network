@@ -194,10 +194,10 @@ actor HTTPClientCore {
             currentResponse = try await interceptor.intercept(currentResponse, for: currentRequest)
         }
         
-        // Cache successful GET responses
-        if let cache = cache, currentRequest.method == .get, (200...299).contains(response.statusCode) {
-            let etag = response.headers["ETag"]
-            await cache.set(response, for: currentRequest, etag: etag)
+        // Cache successful GET responses (store post-interceptor response)
+        if let cache = cache, currentRequest.method == .get, (200...299).contains(currentResponse.statusCode) {
+            let etag = currentResponse.headers["ETag"]
+            await cache.set(currentResponse, for: currentRequest, etag: etag)
         }
         
         return currentResponse
@@ -220,22 +220,35 @@ actor HTTPClientCore {
             
             // Validate response
             guard (200...299).contains(response.statusCode) else {
-                let error = NetworkError.invalidResponse(statusCode: response.statusCode, body: response.body)
-                if attempt >= configuration.retry.maxAttempts {
-                    throw NetworkError.retryExhausted(underlying: error, attempts: attempt)
-                }
-                throw error
+                throw NetworkError.invalidResponse(statusCode: response.statusCode, body: response.body)
             }
             
             return response
         } catch let error as NetworkError {
             if case .cancelled = error { throw error }
-            if case .transport = error, attempt < configuration.retry.maxAttempts {
-                let delay = configuration.retry.backoff.delay(forAttempt: attempt)
+            // Check if we should retry
+            let shouldRetry: Bool
+            let delay: TimeInterval
+            switch error {
+            case .transport:
+                shouldRetry = attempt < configuration.retry.maxAttempts
+                delay = configuration.retry.backoff.delay(forAttempt: attempt)
+            case .invalidResponse:
+                shouldRetry = attempt < configuration.retry.maxAttempts
+                    && configuration.retry.retryableStatusCodes.contains(error.statusCode ?? 0)
+                    && configuration.retry.retryableMethods.contains(request.method)
+                delay = configuration.retry.backoff.delay(forAttempt: attempt)
+            default:
+                shouldRetry = false
+                delay = 0
+            }
+            
+            if shouldRetry {
                 try await Task.sleep(for: .seconds(delay))
                 try Task.checkCancellation()
                 return try await sendWithRetry(request, attempt: attempt + 1)
             }
+            
             if attempt >= configuration.retry.maxAttempts {
                 throw NetworkError.retryExhausted(underlying: error, attempts: attempt)
             }

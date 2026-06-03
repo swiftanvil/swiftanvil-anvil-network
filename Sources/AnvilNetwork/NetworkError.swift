@@ -30,4 +30,16 @@ public indirect enum NetworkError: Error, Sendable {
     
     /// An interceptor rejected the request.
     case interceptorRejected(reason: String)
+    
+    /// The HTTP status code associated with this error, if any.
+    public var statusCode: Int? {
+        switch self {
+        case .invalidResponse(let statusCode, _):
+            return statusCode
+        case .retryExhausted(let underlying, _):
+            return underlying.statusCode
+        default:
+            return nil
+        }
+    }
 }
