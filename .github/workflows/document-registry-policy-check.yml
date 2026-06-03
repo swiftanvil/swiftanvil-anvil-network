@@ -7,4 +7,4 @@ on:
 
 jobs:
   document-registry-policy:
-    uses: swiftanvil/swiftanvil-enforcement/.github/workflows/document-registry-policy.yml@main
+    uses: swiftanvil/swiftanvil-enforcement/.github/workflows/document-registry-policy.yml@v1
