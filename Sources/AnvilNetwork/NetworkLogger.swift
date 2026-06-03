@@ -1,5 +1,8 @@
 import Foundation
+
+#if canImport(os)
 import os.log
+#endif
 
 /// Logs network activity.
 public protocol NetworkLogger: Sendable {
@@ -8,23 +11,40 @@ public protocol NetworkLogger: Sendable {
     func logError(_ error: NetworkError, for request: HTTPRequest) async
 }
 
-/// Default logger using OSLog.
+/// Default logger using OSLog on Apple platforms, print on Linux.
 public struct DefaultNetworkLogger: NetworkLogger {
-    private let logger: Logger
+    private let subsystem: String
+    private let category: String
     
     public init(subsystem: String = "com.swiftanvil.network", category: String = "HTTP") {
-        self.logger = Logger(subsystem: subsystem, category: category)
+        self.subsystem = subsystem
+        self.category = category
     }
     
     public func logRequest(_ request: HTTPRequest) async {
-        logger.info("➡️ \(request.method.rawValue) \(request.url.absoluteString)")
+        let message = "➡️ \(request.method.rawValue) \(request.url.absoluteString)"
+        #if canImport(os)
+        Logger(subsystem: subsystem, category: category).info("\(message)")
+        #else
+        print(message)
+        #endif
     }
     
     public func logResponse(_ response: HTTPResponse, for request: HTTPRequest) async {
-        logger.info("⬅️ \(response.statusCode) \(request.url.absoluteString)")
+        let message = "⬅️ \(response.statusCode) \(request.url.absoluteString)"
+        #if canImport(os)
+        Logger(subsystem: subsystem, category: category).info("\(message)")
+        #else
+        print(message)
+        #endif
     }
     
     public func logError(_ error: NetworkError, for request: HTTPRequest) async {
-        logger.error("❌ \(String(describing: error)) \(request.url.absoluteString)")
+        let message = "❌ \(String(describing: error)) \(request.url.absoluteString)"
+        #if canImport(os)
+        Logger(subsystem: subsystem, category: category).error("\(message)")
+        #else
+        print(message)
+        #endif
     }
 }

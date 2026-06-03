@@ -1,5 +1,13 @@
 import Foundation
 
+/// A wrapper that makes any `Error` `Sendable` by capturing its description.
+public struct SendableError: Sendable {
+    public let description: String
+    public init(_ error: Error) {
+        self.description = String(describing: error)
+    }
+}
+
 /// Errors that can occur during a network request.
 public indirect enum NetworkError: Error, Sendable {
     /// A transport-level error (no connection, timeout, etc.).
@@ -9,10 +17,10 @@ public indirect enum NetworkError: Error, Sendable {
     case invalidResponse(statusCode: Int, body: Data?)
     
     /// Failed to decode the response body.
-    case decoding(Error, Data)
+    case decoding(SendableError, Data)
     
     /// Failed to encode the request body.
-    case encoding(Error)
+    case encoding(SendableError)
     
     /// All retry attempts were exhausted.
     case retryExhausted(underlying: NetworkError, attempts: Int)

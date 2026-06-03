@@ -18,8 +18,8 @@ public struct URLSessionTransport: HTTPTransport {
         urlRequest.httpMethod = request.method.rawValue
         urlRequest.allHTTPHeaderFields = request.headers.allHeaders()
         
-        if let body = request.body {
-            urlRequest.httpBody = try body.encoded()
+        if !request.body.isEmpty {
+            urlRequest.httpBody = request.body.encoded()
         }
         
         do {

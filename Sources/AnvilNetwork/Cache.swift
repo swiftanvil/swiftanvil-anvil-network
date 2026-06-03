@@ -36,9 +36,11 @@ actor HTTPResponseCache {
     private var storage: [String: CacheEntry] = [:]
     private var accessOrder: [String] = []
     private let maxSize: Int
+    private let defaultTTL: TimeInterval
     
-    init(maxSize: Int) {
+    init(maxSize: Int, defaultTTL: TimeInterval = 300) {
         self.maxSize = maxSize
+        self.defaultTTL = defaultTTL
     }
     
     func get(for request: HTTPRequest) -> CacheEntry? {
@@ -61,7 +63,7 @@ actor HTTPResponseCache {
             response: response,
             cachedAt: Date(),
             etag: etag,
-            ttl: ttl ?? 300
+            ttl: ttl ?? defaultTTL
         )
         
         if storage[key] == nil && storage.count >= maxSize {
@@ -84,8 +86,8 @@ actor HTTPResponseCache {
     }
     
     private func cacheKey(for request: HTTPRequest) -> String {
-        // Include auth scope in key if present
-        let authHash = request.headers["Authorization"]?.hashValue ?? 0
-        return "\(request.method.rawValue)|\(request.url.absoluteString)|\(authHash)"
+        // Use literal auth header for stable cache key
+        let authScope = request.headers["Authorization"] ?? ""
+        return "\(request.method.rawValue)|\(request.url.absoluteString)|\(authScope)"
     }
 }
