@@ -1,0 +1,10 @@
+name: Document Registry Policy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  document-registry-policy:
+    uses: swiftanvil/swiftanvil-enforcement/.github/workflows/document-registry-policy.yml@main
