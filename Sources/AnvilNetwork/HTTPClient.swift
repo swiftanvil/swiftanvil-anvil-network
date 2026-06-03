@@ -165,12 +165,18 @@ actor HTTPClientCore {
     }
     
     func copy() -> HTTPClientCore {
-        HTTPClientCore(
+        let newCache: HTTPResponseCache?
+        if let existing = cache {
+            newCache = HTTPResponseCache(maxSize: existing.maxSize, defaultTTL: existing.defaultTTL)
+        } else {
+            newCache = nil
+        }
+        return HTTPClientCore(
             configuration: configuration,
             transport: transport,
             requestInterceptors: requestInterceptors,
             responseInterceptors: responseInterceptors,
-            cache: cache
+            cache: newCache
         )
     }
     

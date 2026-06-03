@@ -35,8 +35,8 @@ struct CacheEntry: Sendable {
 actor HTTPResponseCache {
     private var storage: [String: CacheEntry] = [:]
     private var accessOrder: [String] = []
-    private let maxSize: Int
-    private let defaultTTL: TimeInterval
+    let maxSize: Int
+    let defaultTTL: TimeInterval
     
     init(maxSize: Int, defaultTTL: TimeInterval = 300) {
         self.maxSize = maxSize
