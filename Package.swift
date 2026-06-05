@@ -7,8 +7,13 @@ let package = Package(
     products: [
         .library(name: "AnvilNetwork", targets: ["AnvilNetwork"]),
     ],
+    dependencies: [
+        .package(path: "../swiftanvil-anvil-core"),
+    ],
     targets: [
-        .target(name: "AnvilNetwork"),
+        .target(name: "AnvilNetwork", dependencies: [
+            .product(name: "AnvilCore", package: "swiftanvil-anvil-core"),
+        ]),
         .testTarget(name: "AnvilNetworkTests", dependencies: ["AnvilNetwork"]),
     ],
     swiftLanguageModes: [.v6]

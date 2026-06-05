@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import AnvilCore
 @testable import AnvilNetwork
 
 // MARK: - HTTPMethod Tests
@@ -358,6 +359,51 @@ struct HTTPClientTests {
         await #expect(throws: NetworkError.self) {
             try await client.get("https://api.example.com").send()
         }
+    }
+    
+    @Test("logger captures network activity")
+    func loggerCapturesNetworkActivity() async throws {
+        let mock = MockTransport()
+        let logger = AnvilLogger()
+        let request = HTTPRequest(method: .get, url: URL(string: "https://api.example.com/users/1")!)
+        let response = HTTPResponse(
+            request: request,
+            statusCode: 200,
+            headers: HTTPHeaders(),
+            body: Data("{\"name\":\"Ada\"}".utf8)
+        )
+        await mock.enqueue(response)
+        
+        let client = HTTPClient(transport: mock, logger: logger)
+        let _ = try await client.get("https://api.example.com/users/1").decode(as: TestUser.self)
+        
+        let entries = await logger.allEntries
+        #expect(entries.count >= 2)
+        #expect(entries.contains(where: { $0.level == .info && $0.message.contains("➡️") }))
+        #expect(entries.contains(where: { $0.level == .debug && $0.message.contains("⬅️") }))
+    }
+    
+    @Test("logger captures network errors")
+    func loggerCapturesErrors() async throws {
+        let mock = MockTransport()
+        let logger = AnvilLogger()
+        let request = HTTPRequest(method: .get, url: URL(string: "https://api.example.com")!)
+        
+        await mock.enqueue(HTTPResponse(request: request, statusCode: 500, headers: HTTPHeaders(), body: Data()))
+        
+        let client = HTTPClient(
+            retry: .init(maxAttempts: 1, retryableStatusCodes: []),
+            transport: mock,
+            logger: logger
+        )
+        
+        await #expect(throws: NetworkError.self) {
+            try await client.get("https://api.example.com").send()
+        }
+        
+        let entries = await logger.allEntries
+        #expect(entries.contains(where: { $0.level == .info && $0.message.contains("➡️") }))
+        #expect(entries.contains(where: { $0.level == .error && $0.message.contains("❌") }))
     }
 }
 

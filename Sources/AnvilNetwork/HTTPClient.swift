@@ -1,4 +1,5 @@
 import Foundation
+import AnvilCore
 
 /// A type-safe, concurrent HTTP client.
 public struct HTTPClient: Sendable {
@@ -8,8 +9,8 @@ public struct HTTPClient: Sendable {
         self.core = core
     }
     
-    public init(configuration: HTTPClientConfiguration = .default, transport: HTTPTransport? = nil) {
-        self.core = HTTPClientCore(configuration: configuration, transport: transport)
+    public init(configuration: HTTPClientConfiguration = .default, transport: HTTPTransport? = nil, logger: AnvilLogger? = nil) {
+        self.core = HTTPClientCore(configuration: configuration, transport: transport, logger: logger)
     }
     
     public init(
@@ -19,7 +20,8 @@ public struct HTTPClient: Sendable {
         retry: RetryConfiguration = .default,
         decoder: JSONDecoder = JSONDecoder(),
         encoder: JSONEncoder = JSONEncoder(),
-        transport: HTTPTransport? = nil
+        transport: HTTPTransport? = nil,
+        logger: AnvilLogger? = nil
     ) {
         self.init(
             configuration: HTTPClientConfiguration(
@@ -30,7 +32,8 @@ public struct HTTPClient: Sendable {
                 decoder: decoder,
                 encoder: encoder
             ),
-            transport: transport
+            transport: transport,
+            logger: logger
         )
     }
     
@@ -154,10 +157,12 @@ actor HTTPClientCore {
     private var requestInterceptors: [RequestInterceptor] = []
     private var responseInterceptors: [ResponseInterceptor] = []
     private var cache: HTTPResponseCache?
+    let logger: AnvilLogger?
     
-    init(configuration: HTTPClientConfiguration, transport: HTTPTransport? = nil) {
+    init(configuration: HTTPClientConfiguration, transport: HTTPTransport? = nil, logger: AnvilLogger? = nil) {
         self.configuration = configuration
         self.transport = transport ?? URLSessionTransport(timeout: configuration.timeout)
+        self.logger = logger
         
         if case .memory(let maxSize) = configuration.cache.strategy {
             self.cache = HTTPResponseCache(maxSize: maxSize, defaultTTL: configuration.cache.defaultTTL)
@@ -176,7 +181,8 @@ actor HTTPClientCore {
             transport: transport,
             requestInterceptors: requestInterceptors,
             responseInterceptors: responseInterceptors,
-            cache: newCache
+            cache: newCache,
+            logger: logger
         )
     }
     
@@ -185,13 +191,15 @@ actor HTTPClientCore {
         transport: HTTPTransport,
         requestInterceptors: [RequestInterceptor],
         responseInterceptors: [ResponseInterceptor],
-        cache: HTTPResponseCache?
+        cache: HTTPResponseCache?,
+        logger: AnvilLogger?
     ) {
         self.configuration = configuration
         self.transport = transport
         self.requestInterceptors = requestInterceptors
         self.responseInterceptors = responseInterceptors
         self.cache = cache
+        self.logger = logger
     }
     
     func addRequestInterceptor(_ interceptor: RequestInterceptor) {
@@ -206,6 +214,11 @@ actor HTTPClientCore {
         // Check cancellation
         try Task.checkCancellation()
         
+        // Log request
+        if let logger = logger {
+            await logger.log(.info, "➡️ \(request.method.rawValue) \(request.url.absoluteString)")
+        }
+        
         // Apply request interceptors
         var currentRequest = request
         for interceptor in requestInterceptors {
@@ -215,17 +228,33 @@ actor HTTPClientCore {
         // Check cache AFTER interceptors (so auth is included in cache key)
         if let cache = cache, currentRequest.method == .get {
             if let entry = await cache.get(for: currentRequest) {
+                if let logger = logger {
+                    await logger.log(.debug, "⬅️ \(entry.response.statusCode) \(currentRequest.url.absoluteString) (cache)")
+                }
                 return entry.response
             }
         }
         
         // Send with retry
-        let response = try await sendWithRetry(currentRequest)
+        let response: HTTPResponse
+        do {
+            response = try await sendWithRetry(currentRequest)
+        } catch let error as NetworkError {
+            if let logger = logger {
+                await logger.log(.error, "❌ \(String(describing: error)) \(currentRequest.url.absoluteString)")
+            }
+            throw error
+        }
         
         // Apply response interceptors
         var currentResponse = response
         for interceptor in responseInterceptors {
             currentResponse = try await interceptor.intercept(currentResponse, for: currentRequest)
+        }
+        
+        // Log response
+        if let logger = logger {
+            await logger.log(.debug, "⬅️ \(currentResponse.statusCode) \(currentRequest.url.absoluteString)")
         }
         
         // Cache successful GET responses (store post-interceptor response)
