@@ -8,7 +8,7 @@ public struct HTTPClientConfiguration: Sendable {
     public let retry: RetryConfiguration
     public let decoder: JSONDecoder
     public let encoder: JSONEncoder
-    
+
     public init(
         baseURL: URL? = nil,
         timeout: TimeoutConfiguration = .default,
@@ -24,7 +24,7 @@ public struct HTTPClientConfiguration: Sendable {
         self.decoder = decoder
         self.encoder = encoder
     }
-    
+
     public static let `default` = HTTPClientConfiguration()
 }
 
@@ -32,11 +32,11 @@ public struct HTTPClientConfiguration: Sendable {
 public struct TimeoutConfiguration: Sendable {
     public let request: TimeInterval
     public let resource: TimeInterval
-    
-    public init(request: TimeInterval = 60, resource: TimeInterval = 604800) {
+
+    public init(request: TimeInterval = 60, resource: TimeInterval = 604_800) {
         self.request = request
         self.resource = resource
     }
-    
+
     public static let `default` = TimeoutConfiguration()
 }

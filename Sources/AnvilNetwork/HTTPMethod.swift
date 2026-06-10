@@ -3,11 +3,11 @@ import Foundation
 /// An HTTP method.
 public struct HTTPMethod: RawRepresentable, Hashable, Sendable {
     public let rawValue: String
-    
+
     public init(rawValue: String) {
         self.rawValue = rawValue.uppercased()
     }
-    
+
     public static let get = HTTPMethod(rawValue: "GET")
     public static let post = HTTPMethod(rawValue: "POST")
     public static let put = HTTPMethod(rawValue: "PUT")

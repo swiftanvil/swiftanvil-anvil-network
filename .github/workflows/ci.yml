@@ -1,11 +1,14 @@
 name: CI
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
 jobs:
-  test:
+  build-and-test:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -13,3 +16,17 @@ jobs:
         run: swift build
       - name: Test
         run: swift test
+
+  lint:
+    needs: build-and-test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SwiftFormat
+        run: brew install swiftformat
+      - name: Install SwiftLint
+        run: brew install swiftlint
+      - name: Lint Format
+        run: swiftformat --lint .
+      - name: Lint Source
+        run: swiftlint lint --reporter github-actions-logging

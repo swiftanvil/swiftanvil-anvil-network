@@ -6,7 +6,7 @@ public struct RetryConfiguration: Sendable {
     public let backoff: BackoffStrategy
     public let retryableStatusCodes: Set<Int>
     public let retryableMethods: Set<HTTPMethod>
-    
+
     public init(
         maxAttempts: Int = 3,
         backoff: BackoffStrategy = .exponential(base: 1.0, maxDelay: 60.0),
@@ -18,7 +18,7 @@ public struct RetryConfiguration: Sendable {
         self.retryableStatusCodes = retryableStatusCodes
         self.retryableMethods = retryableMethods
     }
-    
+
     public static let `default` = RetryConfiguration()
 }
 
@@ -27,16 +27,16 @@ public enum BackoffStrategy: Sendable {
     case exponential(base: TimeInterval, maxDelay: TimeInterval)
     case linear(delay: TimeInterval)
     case fixed(delay: TimeInterval)
-    
+
     func delay(forAttempt attempt: Int) -> TimeInterval {
         switch self {
-        case .exponential(let base, let maxDelay):
+        case let .exponential(base, maxDelay):
             let delay = base * pow(2.0, Double(attempt))
-            let jittered = delay * Double.random(in: 0.5...1.0)
+            let jittered = delay * Double.random(in: 0.5 ... 1.0)
             return min(jittered, maxDelay)
-        case .linear(let delay):
+        case let .linear(delay):
             return delay * Double(attempt)
-        case .fixed(let delay):
+        case let .fixed(delay):
             return delay
         }
     }
